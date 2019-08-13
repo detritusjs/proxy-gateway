@@ -847,6 +847,7 @@ export namespace GatewayRawEvents {
   }
 
   export interface RawUser {
+    avatar: null | string,
     bot: boolean,
     discriminator: string,
     id: string,

@@ -327,8 +327,19 @@ RoleSchema.index({
 
 
 
-export interface IUser extends GatewayRawEvents.RawUserMe {
-
+export interface IUser {
+  avatar: null | string,
+  bot: boolean,
+  discriminator: string,
+  email?: string,
+  flags?: number,
+  locale?: string,
+  id: string,
+  mfa_enabled?: boolean,
+  phone?: string,
+  premium_type?: number,
+  username: string,
+  verified?: boolean,
 }
 
 export type TUserSchema = IUser & Document;

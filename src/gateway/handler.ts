@@ -1,6 +1,7 @@
 import {
   GatewayDispatchEvents,
   GatewayOpCodes,
+  PresenceStatuses,
 } from '../constants';
 import { MockGateway } from '../mockgateway';
 
@@ -94,8 +95,9 @@ export class GatewayDispatchHandler {
   async [GatewayDispatchEvents.READY](data: GatewayRawEvents.Ready) {
     await this.mock.reset();
 
+    const user = <IUser> <unknown> data.user;
+    await CreationTools.createUsers(this.mock, [user]);
 
-    await CreationTools.createUsers(this.mock, [data.user]);
     if (data.private_channels) {
       await CreationTools.createChannels(this.mock, data.private_channels);
     }
@@ -196,7 +198,184 @@ export class GatewayDispatchHandler {
     }));
   }
 
+  async [GatewayDispatchEvents.GUILD_MEMBER_ADD](data: GatewayRawEvents.GuildMemberAdd) {
+    const _shardId = this.mock.shardId;
+    const { Guild } = this.mock.models;
+
+    if (Guild) {
+      await Guild.updateOne({id: data.guild_id, _shardId}, {$inc: {count: 1}});
+    }
+
+    const user = <IUser> <unknown> data.user;
+    await CreationTools.createUsers(this.mock, [user]);
+
+    const member = <IMember> <unknown> data;
+    member.user_id = user.id;
+    await CreationTools.createMembers(this.mock, [member]);
+  }
+
+  async [GatewayDispatchEvents.GUILD_MEMBER_REMOVE](data: GatewayRawEvents.GuildMemberRemove) {
+    const _shardId = this.mock.shardId;
+    const { Guild, Member } = this.mock.models;
+
+    if (Guild) {
+      await Guild.updateOne({id: data.guild_id, _shardId}, {$inc: {count: -1}});
+    }
+    if (Member) {
+      await Member.deleteOne({
+        guild_id: data.guild_id,
+        id: data.user.id,
+        _shardId,
+      });
+    }
+  }
+
+  async [GatewayDispatchEvents.GUILD_MEMBER_UPDATE](data: GatewayRawEvents.GuildMemberUpdate) {
+    // todo: premium subscription count increase
+    const user = <IUser> <unknown> data.user;
+    await CreationTools.createUsers(this.mock, [user]);
+
+    const member = <IMember> <unknown> data;
+    member.user_id = user.id;
+    await CreationTools.createMembers(this.mock, [member]);
+  }
+
+  async [GatewayDispatchEvents.GUILD_MEMBERS_CHUNK](data: GatewayRawEvents.GuildMembersChunk) {
+    await CreationTools.createUsers(this.mock, data.members.map((member) => member.user));
+    await CreationTools.createMembers(this.mock, data.members.map((member: any) => {
+      member.guild_id = data.guild_id;
+      return member;
+    }));
+    if (data.presences) {
+      await CreationTools.createPresences(this.mock, data.presences.map((presence: any) => {
+        presence.guild_id = data.guild_id;
+        return presence;
+      }));
+    }
+  }
+
+  async [GatewayDispatchEvents.GUILD_ROLE_CREATE](data: GatewayRawEvents.GuildRoleCreate) {
+    const role = <any> data.role;
+    role.guild_id = data.guild_id;
+    await CreationTools.createRoles(this.mock, [role]);
+  }
+
+  async [GatewayDispatchEvents.GUILD_ROLE_DELETE](data: GatewayRawEvents.GuildRoleDelete) {
+    const _shardId = this.mock.shardId;
+    const { Role } = this.mock.models;
+
+    if (Role) {
+      await Role.deleteOne({
+        guild_id: data.guild_id,
+        id: data.role_id,
+        _shardId,
+      });
+    }
+  }
+
+  async [GatewayDispatchEvents.GUILD_ROLE_UPDATE](data: GatewayRawEvents.GuildRoleUpdate) {
+    const role = <any> data.role;
+    role.guild_id = data.guild_id;
+    await CreationTools.createRoles(this.mock, [role]);
+  }
+
   async [GatewayDispatchEvents.GUILD_UPDATE](data: GatewayRawEvents.GuildUpdate) {
     await CreationTools.createRawGuilds(this.mock, [data]);
+  }
+
+  async [GatewayDispatchEvents.MESSAGE_CREATE](data: GatewayRawEvents.MessageCreate) {
+    const members: Array<IMember> = [];
+    const users: Array<IUser> = [data.author];
+
+    if (data.member) {
+      const member = <IMember> data.member;
+      member.guild_id = <string> data.guild_id;
+      member.user_id = data.author.id;
+      members.push(member);
+    }
+
+    if (data.mentions) {
+      for (const mention of data.mentions) {
+        users.push(<IUser> <any> mention);
+
+        if (mention.member) {
+          const member = <IMember> mention.member;
+          member.guild_id = <string> data.guild_id;
+          member.user_id = mention.id;
+          members.push(member);
+        }
+      }
+    }
+
+    await CreationTools.createMembers(this.mock, members);
+    await CreationTools.createUsers(this.mock, users);
+
+    // update channel last message id
+  }
+
+  async [GatewayDispatchEvents.PRESENCE_UPDATE](data: GatewayRawEvents.PresenceUpdate) {
+    const user = <IUser> <unknown> data.user;
+    await CreationTools.createUsers(this.mock, [user]);
+
+    const cacheId = data.guild_id || '@me';
+    if (data.status === PresenceStatuses.OFFLINE) {
+      const _shardId = this.mock.shardId;
+      const { Presence } = this.mock.models;
+      if (Presence) {
+        await Presence.deleteOne({
+          cache_id: cacheId,
+          user_id: user.id,
+          _shardId,
+        });
+      }
+    } else {
+      const presence = <IPresence> <unknown> data;
+      presence.cache_id = cacheId;
+      presence.user_id = user.id;
+      await CreationTools.createPresences(this.mock, [presence]);
+    }
+
+    if (data.guild_id) {
+      const member = <IMember> <unknown> data;
+      member.guild_id = data.guild_id;
+      member.user_id = user.id;
+      await CreationTools.createMembers(this.mock, [member]);
+    }
+  }
+
+  async [GatewayDispatchEvents.TYPING_START](data: GatewayRawEvents.TypingStart) {
+    if (data.member) {
+      const user = <IUser> data.member.user;
+
+      const member = <IMember> data.member;
+      member.guild_id = <string> data.guild_id;
+      member.user_id = user.id;
+
+      await CreationTools.createUsers(this.mock, [user]);
+      await CreationTools.createMembers(this.mock, [member]);
+    }
+  }
+
+  async [GatewayDispatchEvents.USER_UPDATE](data: GatewayRawEvents.UserUpdate) {
+    const user = <IUser> <unknown> data;
+    await CreationTools.createUsers(this.mock, [user]);
+  }
+
+  async [GatewayDispatchEvents.VOICE_STATE_UPDATE](data: GatewayRawEvents.VoiceStateUpdate) {
+    const voiceState = <IVoiceState> <unknown> data;
+    voiceState.server_id = data.guild_id || data.channel_id;
+    await CreationTools.createVoiceStates(this.mock, [voiceState]);
+
+    if (data.member) {
+      const user = <IUser> <unknown> data.member.user;
+      await CreationTools.createUsers(this.mock, [user]);
+
+      const member = <IMember> <unknown> data.member;
+      if (data.guild_id) {
+        member.guild_id = data.guild_id;
+      }
+      member.user_id = user.id;
+      await CreationTools.createMembers(this.mock, [member]);
+    }
   }
 }

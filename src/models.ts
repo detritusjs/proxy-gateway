@@ -66,7 +66,7 @@ export class Models {
 
   async reset() {
     const _shardId = this.mock.shardId;
-    for (let key in ModelKeys) {
+    for (const key of ModelKeys) {
       if (key in this) {
         const model = <Model<any>> (<any> this)[key];
         if (model) {
