@@ -44,21 +44,7 @@ export class MockGateway {
   }
 
   async reset(): Promise<void> {
-    const {
-      Channel,
-      Overwrite,
-      User,
-    } = this.models;
-
-    if (Channel) {
-      await Channel.deleteMany({_shardId: this.shardId});
-    }
-    if (Overwrite) {
-      await Overwrite.deleteMany({_shardId: this.shardId});
-    }
-    if (User) {
-      await User.deleteMany({_shardId: this.shardId});
-    }
+    await this.models.reset();
   }
 
   async run(

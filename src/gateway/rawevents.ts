@@ -303,14 +303,14 @@ export namespace GatewayRawEvents {
     embeds?: Array<RawMessageEmbed>,
     guild_id?: string,
     id: string,
-    member?: RawMember,
+    member?: RawMemberWithoutUser,
     mention_everyone: boolean,
     mention_roles: Array<string>,
     mentions: Array<{
       bot: boolean,
       discriminator: string,
       id: string,
-      member?: RawMember,
+      member?: RawMemberWithoutUser,
       username: string,
     }>,
     message_reference?: {
@@ -620,7 +620,7 @@ export namespace GatewayRawEvents {
   export interface RawEmoji extends RawEmojiPartial {
     available: boolean,
     managed: boolean,
-    required_colons: boolean,
+    require_colons: boolean,
     roles: Array<string>,
   }
 
@@ -687,7 +687,7 @@ export namespace GatewayRawEvents {
     member?: RawMember,
   }
 
-  export interface RawMember {
+  export interface RawMemberWithoutUser {
     deaf: boolean,
     joined_at: string,
     mute: boolean,
@@ -695,7 +695,10 @@ export namespace GatewayRawEvents {
     premium_since: null | string,
     presence?: RawPresence, // Guild Member List Update has this
     roles: Array<string>,
-    user?: RawUser,
+  }
+
+  export interface RawMember extends RawMemberWithoutUser {
+    user: RawUser,
   }
 
   export interface RawMessageAttachment {
