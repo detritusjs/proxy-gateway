@@ -27,29 +27,37 @@ export interface GatewayHandlerOptions {
 }
 
 export class GatewayHandler {
+  readonly shard: MockGateway;
+
   disabledEvents: Set<string>;
   dispatchHandler: GatewayDispatchHandler;
   loadAllMembers: boolean;
-  memberChunksLeft: Set<string>;
-  mock: MockGateway;
+  memberChunks: {
+    done: Set<string>,
+    left: Set<string>,
+  } = {
+    done: new Set(),
+    left: new Set(),
+  };
+  queue: Array<[Function, any]> = [];
+  ready: boolean = false;
 
   constructor(
-    mock: MockGateway,
+    shard: MockGateway,
     options: GatewayHandlerOptions = {},
   ) {
-    this.mock = mock;
-    this.mock.gateway.on('packet', this.onPacket.bind(this));
+    this.shard = shard;
+    this.shard.gateway.on('packet', this.onPacket.bind(this));
 
     this.dispatchHandler = new GatewayDispatchHandler(this);
     this.disabledEvents = new Set((options.disabledEvents || []).map((v) => {
       return v.toUpperCase();
     }));
     this.loadAllMembers = !!options.loadAllMembers;
-    this.memberChunksLeft = new Set();
   }
 
   get gateway() {
-    return this.mock.gateway;
+    return this.shard.gateway;
   }
 
   get shouldLoadAllMembers(): boolean {
@@ -67,9 +75,27 @@ export class GatewayHandler {
     if (!this.disabledEvents.has(name)) {
       const handler = this.dispatchHandler.getHandler(name);
       if (handler) {
-        handler.call(this.dispatchHandler, data);
+        switch (name) {
+          case GatewayDispatchEvents.READY: {
+            handler.call(this.dispatchHandler, data);
+          }; break;
+          default: {
+            if (this.ready) {
+              handler.call(this.dispatchHandler, data);
+            } else {
+              this.queue.push([handler, data]);
+            }
+          };
+        }
       }
     }
+  }
+
+  async reset() {
+    this.queue.length = 0;
+    await this.shard.reset();
+    this.memberChunks.done.clear();
+    this.memberChunks.left.clear();
   }
 }
 
@@ -84,8 +110,8 @@ export class GatewayDispatchHandler {
     this.handler = handler;
   }
 
-  get mock() {
-    return this.handler.mock;
+  get shard() {
+    return this.handler.shard;
   }
 
   getHandler(name: string): GatewayDispatchHandlerFunction | undefined {
@@ -93,34 +119,64 @@ export class GatewayDispatchHandler {
   }
 
   async [GatewayDispatchEvents.READY](data: GatewayRawEvents.Ready) {
-    await this.mock.reset();
+    this.handler.ready = false;
+    await this.handler.reset();
 
     const user = <IUser> <unknown> data.user;
-    await CreationTools.createUsers(this.mock, [user]);
+    await CreationTools.createUsers(this.shard, [user]);
 
     if (data.private_channels) {
-      await CreationTools.createChannels(this.mock, data.private_channels);
+      await CreationTools.createChannels(this.shard, data.private_channels);
     }
 
     if (data.guilds) {
-      await CreationTools.createRawGuilds(this.mock, data.guilds);
+      await CreationTools.createRawGuilds(this.shard, data.guilds);
+      if (this.handler.shouldLoadAllMembers) {
+        const requestChunksNow: Array<string> = [];
+        for (const guild of data.guilds) {
+          if (guild.unavailable) {
+            this.handler.memberChunks.left.add(guild.id);
+          } else {
+            if (this.shard.gateway.largeThreshold < guild.member_count) {
+              requestChunksNow.push(guild.id);
+              this.handler.memberChunks.done.add(guild.id);
+            }
+          }
+        }
+        if (requestChunksNow.length) {
+          this.shard.gateway.requestGuildMembers(requestChunksNow, {
+            limit: 0,
+            presences: true,
+            query: '',
+          });
+        }
+      }
     }
 
     if (data.presences) {
-      await CreationTools.createPresences(this.mock, data.presences.map((presence: any) => {
+      await CreationTools.createPresences(this.shard, data.presences.map((presence: any) => {
         presence.cache_id = '@me';
+        presence.user_id = presence.user.id;
         return <IPresence> presence;
       }));
     }
+
+    while (this.handler.queue.length) {
+      const [handler, raw] = (<[Function, any]> this.handler.queue.shift());
+      await Promise.resolve(handler.call(this, raw));
+    }
+
+    this.handler.ready = true;
+    this.shard.emit('ready');
   }
 
   async [GatewayDispatchEvents.CHANNEL_CREATE](data: GatewayRawEvents.ChannelCreate) {
-    await CreationTools.createChannels(this.mock, [data]);
+    await CreationTools.createChannels(this.shard, [data]);
   }
 
   async [GatewayDispatchEvents.CHANNEL_DELETE](data: GatewayRawEvents.ChannelDelete) {
-    const _shardId = this.mock.shardId;
-    const { Channel } = this.mock.models;
+    const _shardId = this.shard.shardId;
+    const { Channel } = this.shard.models;
 
     if (Channel) {
       await Channel.deleteOne({id: data.id, _shardId});
@@ -130,19 +186,37 @@ export class GatewayDispatchHandler {
   async [GatewayDispatchEvents.CHANNEL_PINS_UPDATE](data: GatewayRawEvents.ChannelPinsUpdate) {
     // pretty much a very partial channel object lol
     const channel = <any> data;
-    await CreationTools.createChannels(this.mock, [channel]);
+    await CreationTools.createChannels(this.shard, [channel]);
   }
 
   async [GatewayDispatchEvents.CHANNEL_UPDATE](data: GatewayRawEvents.ChannelUpdate) {
-    await CreationTools.createChannels(this.mock, [data]);
+    await CreationTools.createChannels(this.shard, [data]);
   }
 
   async [GatewayDispatchEvents.GUILD_CREATE](data: GatewayRawEvents.GuildCreate) {
-    await CreationTools.createRawGuilds(this.mock, [data]);
+    await CreationTools.createRawGuilds(this.shard, [data]);
+
+    if (this.handler.shouldLoadAllMembers) {
+      if (!this.handler.memberChunks.done.has(data.id)) {
+        this.handler.memberChunks.left.add(data.id);
+      }
+
+      if (this.handler.memberChunks.left.has(data.id)) {
+        if (this.shard.gateway.largeThreshold < data.member_count) {
+          this.shard.gateway.requestGuildMembers(data.id, {
+            limit: 0,
+            presences: true,
+            query: '',
+          });
+        }
+        this.handler.memberChunks.done.add(data.id);
+        this.handler.memberChunks.left.delete(data.id);
+      }
+    }
   }
 
   async [GatewayDispatchEvents.GUILD_DELETE](data: GatewayRawEvents.GuildDelete) {
-    const _shardId = this.mock.shardId;
+    const _shardId = this.shard.shardId;
     const {
       Channel,
       Emoji,
@@ -151,13 +225,13 @@ export class GatewayDispatchHandler {
       Presence,
       Role,
       VoiceState,
-    } = this.mock.models;
+    } = this.shard.models;
 
     if (data.unavailable) {
       // guild just became unavailable, merge into db
       if (Guild) {
         const guild = <any> data;
-        await CreationTools.createGuilds(this.mock, [guild]);
+        await CreationTools.createGuilds(this.shard, [guild]);
       }
     } else {
       if (Guild) {
@@ -185,38 +259,38 @@ export class GatewayDispatchHandler {
   }
 
   async [GatewayDispatchEvents.GUILD_EMOJIS_UPDATE](data: GatewayRawEvents.GuildEmojisUpdate) {
-    const _shardId = this.mock.shardId;
-    const { Emoji } = this.mock.models;
+    const _shardId = this.shard.shardId;
+    const { Emoji } = this.shard.models;
 
     if (Emoji) {
       await Emoji.deleteMany({guild_id: data.guild_id, _shardId});
     }
 
-    await CreationTools.createEmojis(this.mock, data.emojis.map((emoji: any) => {
+    await CreationTools.createEmojis(this.shard, data.emojis.map((emoji: any) => {
       emoji.guild_id = data.guild_id;
       return emoji;
     }));
   }
 
   async [GatewayDispatchEvents.GUILD_MEMBER_ADD](data: GatewayRawEvents.GuildMemberAdd) {
-    const _shardId = this.mock.shardId;
-    const { Guild } = this.mock.models;
+    const _shardId = this.shard.shardId;
+    const { Guild } = this.shard.models;
 
     if (Guild) {
       await Guild.updateOne({id: data.guild_id, _shardId}, {$inc: {count: 1}});
     }
 
     const user = <IUser> <unknown> data.user;
-    await CreationTools.createUsers(this.mock, [user]);
+    await CreationTools.createUsers(this.shard, [user]);
 
     const member = <IMember> <unknown> data;
     member.user_id = user.id;
-    await CreationTools.createMembers(this.mock, [member]);
+    await CreationTools.createMembers(this.shard, [member]);
   }
 
   async [GatewayDispatchEvents.GUILD_MEMBER_REMOVE](data: GatewayRawEvents.GuildMemberRemove) {
-    const _shardId = this.mock.shardId;
-    const { Guild, Member } = this.mock.models;
+    const _shardId = this.shard.shardId;
+    const { Guild, Member } = this.shard.models;
 
     if (Guild) {
       await Guild.updateOne({id: data.guild_id, _shardId}, {$inc: {count: -1}});
@@ -233,22 +307,24 @@ export class GatewayDispatchHandler {
   async [GatewayDispatchEvents.GUILD_MEMBER_UPDATE](data: GatewayRawEvents.GuildMemberUpdate) {
     // todo: premium subscription count increase
     const user = <IUser> <unknown> data.user;
-    await CreationTools.createUsers(this.mock, [user]);
+    await CreationTools.createUsers(this.shard, [user]);
 
     const member = <IMember> <unknown> data;
     member.user_id = user.id;
-    await CreationTools.createMembers(this.mock, [member]);
+    await CreationTools.createMembers(this.shard, [member]);
   }
 
   async [GatewayDispatchEvents.GUILD_MEMBERS_CHUNK](data: GatewayRawEvents.GuildMembersChunk) {
-    await CreationTools.createUsers(this.mock, data.members.map((member) => member.user));
-    await CreationTools.createMembers(this.mock, data.members.map((member: any) => {
+    await CreationTools.createUsers(this.shard, data.members.map((member) => member.user));
+    await CreationTools.createMembers(this.shard, data.members.map((member: any) => {
       member.guild_id = data.guild_id;
+      member.user_id = member.user.id;
       return member;
     }));
     if (data.presences) {
-      await CreationTools.createPresences(this.mock, data.presences.map((presence: any) => {
+      await CreationTools.createPresences(this.shard, data.presences.map((presence: any) => {
         presence.guild_id = data.guild_id;
+        presence.user_id = presence.user.id;
         return presence;
       }));
     }
@@ -257,12 +333,12 @@ export class GatewayDispatchHandler {
   async [GatewayDispatchEvents.GUILD_ROLE_CREATE](data: GatewayRawEvents.GuildRoleCreate) {
     const role = <any> data.role;
     role.guild_id = data.guild_id;
-    await CreationTools.createRoles(this.mock, [role]);
+    await CreationTools.createRoles(this.shard, [role]);
   }
 
   async [GatewayDispatchEvents.GUILD_ROLE_DELETE](data: GatewayRawEvents.GuildRoleDelete) {
-    const _shardId = this.mock.shardId;
-    const { Role } = this.mock.models;
+    const _shardId = this.shard.shardId;
+    const { Role } = this.shard.models;
 
     if (Role) {
       await Role.deleteOne({
@@ -276,11 +352,11 @@ export class GatewayDispatchHandler {
   async [GatewayDispatchEvents.GUILD_ROLE_UPDATE](data: GatewayRawEvents.GuildRoleUpdate) {
     const role = <any> data.role;
     role.guild_id = data.guild_id;
-    await CreationTools.createRoles(this.mock, [role]);
+    await CreationTools.createRoles(this.shard, [role]);
   }
 
   async [GatewayDispatchEvents.GUILD_UPDATE](data: GatewayRawEvents.GuildUpdate) {
-    await CreationTools.createRawGuilds(this.mock, [data]);
+    await CreationTools.createRawGuilds(this.shard, [data]);
   }
 
   async [GatewayDispatchEvents.MESSAGE_CREATE](data: GatewayRawEvents.MessageCreate) {
@@ -307,20 +383,20 @@ export class GatewayDispatchHandler {
       }
     }
 
-    await CreationTools.createMembers(this.mock, members);
-    await CreationTools.createUsers(this.mock, users);
+    await CreationTools.createMembers(this.shard, members);
+    await CreationTools.createUsers(this.shard, users);
 
     // update channel last message id
   }
 
   async [GatewayDispatchEvents.PRESENCE_UPDATE](data: GatewayRawEvents.PresenceUpdate) {
     const user = <IUser> <unknown> data.user;
-    await CreationTools.createUsers(this.mock, [user]);
+    await CreationTools.createUsers(this.shard, [user]);
 
     const cacheId = data.guild_id || '@me';
     if (data.status === PresenceStatuses.OFFLINE) {
-      const _shardId = this.mock.shardId;
-      const { Presence } = this.mock.models;
+      const _shardId = this.shard.shardId;
+      const { Presence } = this.shard.models;
       if (Presence) {
         await Presence.deleteOne({
           cache_id: cacheId,
@@ -332,14 +408,14 @@ export class GatewayDispatchHandler {
       const presence = <IPresence> <unknown> data;
       presence.cache_id = cacheId;
       presence.user_id = user.id;
-      await CreationTools.createPresences(this.mock, [presence]);
+      await CreationTools.createPresences(this.shard, [presence]);
     }
 
     if (data.guild_id) {
       const member = <IMember> <unknown> data;
       member.guild_id = data.guild_id;
       member.user_id = user.id;
-      await CreationTools.createMembers(this.mock, [member]);
+      await CreationTools.createMembers(this.shard, [member]);
     }
   }
 
@@ -351,31 +427,43 @@ export class GatewayDispatchHandler {
       member.guild_id = <string> data.guild_id;
       member.user_id = user.id;
 
-      await CreationTools.createUsers(this.mock, [user]);
-      await CreationTools.createMembers(this.mock, [member]);
+      await CreationTools.createUsers(this.shard, [user]);
+      await CreationTools.createMembers(this.shard, [member]);
     }
   }
 
   async [GatewayDispatchEvents.USER_UPDATE](data: GatewayRawEvents.UserUpdate) {
     const user = <IUser> <unknown> data;
-    await CreationTools.createUsers(this.mock, [user]);
+    await CreationTools.createUsers(this.shard, [user]);
   }
 
   async [GatewayDispatchEvents.VOICE_STATE_UPDATE](data: GatewayRawEvents.VoiceStateUpdate) {
     const voiceState = <IVoiceState> <unknown> data;
     voiceState.server_id = data.guild_id || data.channel_id;
-    await CreationTools.createVoiceStates(this.mock, [voiceState]);
+    if (data.channel_id) {
+      await CreationTools.createVoiceStates(this.shard, [voiceState]);
+    } else {
+      const _shardId = this.shard.shardId;
+      const { VoiceState } = this.shard.models;
+      if (VoiceState) {
+        await VoiceState.deleteOne({
+          server_id: voiceState.server_id,
+          user_id: voiceState.user_id,
+          _shardId,
+        });
+      }
+    }
 
     if (data.member) {
       const user = <IUser> <unknown> data.member.user;
-      await CreationTools.createUsers(this.mock, [user]);
+      await CreationTools.createUsers(this.shard, [user]);
 
       const member = <IMember> <unknown> data.member;
       if (data.guild_id) {
         member.guild_id = data.guild_id;
       }
       member.user_id = user.id;
-      await CreationTools.createMembers(this.mock, [member]);
+      await CreationTools.createMembers(this.shard, [member]);
     }
   }
 }

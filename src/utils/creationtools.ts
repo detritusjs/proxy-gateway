@@ -12,6 +12,8 @@ import {
 } from '../schemas';
 
 
+export const DefaultBulkWriteOptions = {ordered: false};
+
 
 export async function createChannels(
   mock: MockGateway,
@@ -33,7 +35,7 @@ export async function createChannels(
         });
       }
       if (operations.length) {
-        await Channel.bulkWrite(operations);
+        await Channel.bulkWrite(operations, <any> DefaultBulkWriteOptions);
       }
     }
   }
@@ -60,7 +62,7 @@ export async function createEmojis(
         });
       }
       if (operations.length) {
-        await Emoji.bulkWrite(operations);
+        await Emoji.bulkWrite(operations, <any> DefaultBulkWriteOptions);
       }
     }
   }
@@ -87,7 +89,7 @@ export async function createGuilds(
         });
       }
       if (operations.length) {
-        await Guild.bulkWrite(operations);
+        await Guild.bulkWrite(operations, <any> DefaultBulkWriteOptions);
       }
     }
   }
@@ -114,7 +116,7 @@ export async function createMembers(
         });
       }
       if (operations.length) {
-        await Member.bulkWrite(operations);
+        await Member.bulkWrite(operations, <any> DefaultBulkWriteOptions);
       }
     }
   }
@@ -140,7 +142,7 @@ export async function createPresences(
         });
       }
       if (operations.length) {
-        await Presence.bulkWrite(operations);
+        await Presence.bulkWrite(operations, <any> DefaultBulkWriteOptions);
       }
     }
   }
@@ -166,7 +168,7 @@ export async function createRoles(
         });
       }
       if (operations.length) {
-        await Role.bulkWrite(operations);
+        await Role.bulkWrite(operations, <any> DefaultBulkWriteOptions);
       }
     }
   }
@@ -192,7 +194,7 @@ export async function createUsers(
         });
       }
       if (operations.length) {
-        await User.bulkWrite(operations);
+        await User.bulkWrite(operations, <any> DefaultBulkWriteOptions);
       }
     }
   }
@@ -218,7 +220,7 @@ export async function createVoiceStates(
         });
       }
       if (operations.length) {
-        await VoiceState.bulkWrite(operations);
+        await VoiceState.bulkWrite(operations, <any> DefaultBulkWriteOptions);
       }
     }
   }

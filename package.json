@@ -10,7 +10,9 @@
   "dependencies": {
     "@types/mongodb": "^3.1.32",
     "@types/mongoose": "^5.5.12",
+    "detritus-client-rest": "^0.4.12",
     "detritus-client-socket": "^0.2.12",
+    "detritus-utils": "^0.1.4",
     "mongoose": "^5.6.9"
   },
   "devDependencies": {

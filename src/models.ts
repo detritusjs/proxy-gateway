@@ -1,6 +1,5 @@
-import { Model } from 'mongoose';
+import { Model, Mongoose } from 'mongoose';
 
-import { MockGateway } from './mockgateway';
 import {
   ChannelSchema,
   EmojiSchema,
@@ -21,7 +20,7 @@ import {
 } from './schemas';
 
 
-const ModelKeys = [
+export const ModelKeys = Object.freeze([
   'Channel',
   'Emoji',
   'Guild',
@@ -30,11 +29,10 @@ const ModelKeys = [
   'Role',
   'User',
   'VoiceState',
-];
-
+]);
 
 export class Models {
-  mock: MockGateway;
+  readonly mongoose = new Mongoose();
 
   Channel?: Model<TChannelSchema>;
   Emoji?: Model<TEmojiSchema>;
@@ -44,14 +42,6 @@ export class Models {
   Role?: Model<TRoleSchema>;
   User?: Model<TUserSchema>;
   VoiceState?: Model<TVoiceStateSchema>;
-
-  constructor(mock: MockGateway) {
-    this.mock = mock;
-  }
-
-  get mongoose() {
-    return this.mock.mongoose;
-  }
 
   intialize() {
     this.Channel = this.mongoose.model<TChannelSchema>('Channel', ChannelSchema, 'channels');
@@ -64,15 +54,12 @@ export class Models {
     this.VoiceState = this.mongoose.model<TVoiceStateSchema>('VoiceState', VoiceStateSchema, 'voicestates');
   }
 
-  async reset() {
-    const _shardId = this.mock.shardId;
-    for (const key of ModelKeys) {
-      if (key in this) {
-        const model = <Model<any>> (<any> this)[key];
-        if (model) {
-          await model.deleteMany({_shardId});
-        }
-      }
-    }
+  async connect(url: string, options: any) {
+    await this.mongoose.connect(url, Object.assign({
+      dbName: 'detritus',
+      useCreateIndex: true,
+      useNewUrlParser: true,
+    }, options));
+    this.intialize();
   }
 }

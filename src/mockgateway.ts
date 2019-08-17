@@ -1,8 +1,16 @@
-import { Mongoose } from 'mongoose';
-import { Gateway } from 'detritus-client-socket';
+import { Model, Mongoose } from 'mongoose';
 
+import {
+  Client as DetritusRestClient,
+  ClientOptions as RestOptions
+} from 'detritus-client-rest';
+import { Gateway } from 'detritus-client-socket';
+import { EventEmitter } from 'detritus-utils';
+
+import { AuthTypes } from './constants';
 import { GatewayHandler, GatewayHandlerOptions } from './gateway/handler';
-import { Models } from './models';
+import { MockGatewayCluster } from './mockgatewaycluster';
+import { Models, ModelKeys } from './models';
 
 
 export interface GatewayOptions extends Gateway.SocketOptions, GatewayHandlerOptions {
@@ -10,29 +18,49 @@ export interface GatewayOptions extends Gateway.SocketOptions, GatewayHandlerOpt
 }
 
 export interface MockGatewayOptions {
+  cluster?: MockGatewayCluster,
+  isBot?: boolean,
   gateway?: GatewayOptions,
+  rest?: RestOptions,
 }
 
 export interface MockGatewayRunOptions {
+  dbOptions?: Object,
+  url?: string,
   wait?: boolean,
 }
 
-export class MockGateway {
-  gateway: Gateway.Socket;
-  handler: GatewayHandler;
-  models: Models;
-  mongoose: Mongoose;
+export class MockGateway extends EventEmitter {
+  readonly cluster?: MockGatewayCluster;
+  readonly gateway: Gateway.Socket;
+  readonly handler: GatewayHandler;
+  readonly models: Models;
+  readonly rest: DetritusRestClient;
 
-  constructor(token: string, options: MockGatewayOptions = {}) {
+  constructor(token: string, options: MockGatewayOptions) {
+    super();
+    if (!token) {
+      throw new Error('Token is required for this library to work.');
+    }
+
+    options = Object.assign({isBot: true}, options);
+
+    this.cluster = options.cluster;
     this.gateway = new Gateway.Socket(token, options.gateway);
-    this.mongoose = new Mongoose();
 
     this.handler = new GatewayHandler(this, options.gateway);
-    this.models = new Models(this);
+    this.models = new Models();
+    this.rest = new DetritusRestClient(token, Object.assign({
+      authType: (options.isBot) ? AuthTypes.BOT : AuthTypes.USER,
+    }, options.rest));
   }
 
   get db() {
     return this.mongoose.connection;
+  }
+
+  get mongoose() {
+    return this.models.mongoose;
   }
 
   get shardCount(): number {
@@ -43,22 +71,36 @@ export class MockGateway {
     return this.gateway.shardId;
   }
 
+  kill(): void {
+    this.gateway.kill();
+    this.reset();
+  }
+
   async reset(): Promise<void> {
-    await this.models.reset();
+    const _shardId = this.shardId;
+    const models = this.models;
+    for (const key of ModelKeys) {
+      if (key in models) {
+        const model = <Model<any>> (<any> models)[key];
+        if (model) {
+          await model.deleteMany({_shardId});
+        }
+      }
+    }
   }
 
   async run(
-    url: string,
-    mongoUrl: string,
+    dbUrl: string,
     options: MockGatewayRunOptions = {},
   ): Promise<MockGateway> {
-    await this.mongoose.connect(mongoUrl, {
-      dbName: 'detritus',
-      useNewUrlParser: true,
-    });
-    this.models.intialize();
+    await this.models.connect(dbUrl, options.dbOptions);
 
-    this.gateway.connect(url);
+    let gatewayUrl = options.url;
+    if (!gatewayUrl) {
+      const data = await this.rest.fetchGateway();
+      gatewayUrl = data.url;
+    }
+    this.gateway.connect(gatewayUrl);
 
     const wait = options.wait || options.wait === undefined;
     await new Promise((resolve) => {

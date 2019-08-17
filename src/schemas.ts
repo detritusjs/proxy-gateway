@@ -23,8 +23,8 @@ export type TChannelSchema = IChannel & Document;
 export const ChannelSchema = new Schema({
   _shardId: {index: true, type: Number},
   bitrate: {set: deleteEmpty, type: Number},
-  guild_id: {set: deleteEmpty, type: String},
-  id: String,
+  guild_id: {index: true, set: deleteEmpty, type: String},
+  id: {index: true, type: String},
   last_message_id: {set: deleteEmpty, type: String},
   last_pin_timestamp: {set: deleteEmpty, type: String},
   name: String,
@@ -69,8 +69,8 @@ export const EmojiSchema = new Schema({
   _shardId: {index: true, type: Number},
   animated: Boolean,
   available: Boolean,
-  guild_id: String,
-  id: String,
+  guild_id: {index: true, type: String},
+  id: {index: true, type: String},
   name: String,
   managed: Boolean,
   require_colons: Boolean,
@@ -134,9 +134,10 @@ export const GuildSchema = new Schema({
   explicit_content_filter: Number,
   features: [String],
   icon: String,
-  id: String,
+  id: {index: true, type: String},
   max_members: Number,
   max_presences: Number,
+  member_count: Number,
   mfa_level: Number,
   name: String,
   owner_id: String,
@@ -176,12 +177,12 @@ export type TMemberSchema = IMember & Document;
 export const MemberSchema = new Schema({
   _shardId: {index: true, type: Number},
   deaf: Boolean,
-  guild_id: String,
+  guild_id: {index: true, type: String},
   mute: Boolean,
   nick: {set: deleteEmpty, type: String},
   premium_since: {set: deleteEmpty, type: String},
   roles: [String],
-  user_id: String,
+  user_id: {index: true, type: String},
 });
 MemberSchema.index({
   _shardId: 1,
@@ -191,6 +192,10 @@ MemberSchema.index({
 MemberSchema.index({
   _shardId: 1,
   guild_id: 1,
+});
+MemberSchema.index({
+  _shardId: 1,
+  user_id: 1,
 });
 
 
@@ -262,7 +267,7 @@ export type TPresenceSchema = IPresence & Document;
 export const PresenceSchema = new Schema({
   _shardId: {index: true, type: Number},
   activities: [PresenceActivitySchema],
-  cache_id: String,
+  cache_id: {index: true, type: String},
   client_status: {
     desktop: {set: deleteEmpty, type: String},
     mobile: {set: deleteEmpty, type: String},
@@ -271,7 +276,7 @@ export const PresenceSchema = new Schema({
   game: {set: deleteEmpty, type: PresenceActivitySchema},
   last_modified: {set: deleteEmpty, type: Number},
   status: String,
-  user_id: String,
+  user_id: {index: true, type: String},
 });
 PresenceSchema.index({
   _shardId: 1,
@@ -281,6 +286,10 @@ PresenceSchema.index({
 PresenceSchema.index({
   _shardId: 1,
   cache_id: 1,
+});
+PresenceSchema.index({
+  _shardId: 1,
+  user_id: 1,
 });
 
 
@@ -302,9 +311,9 @@ export type TRoleSchema = IRole & Document;
 export const RoleSchema = new Schema({
   _shardId: {index: true, type: Number},
   color: Number,
-  guild_id: String,
+  guild_id: {index: true, type: String},
   hoist: Boolean,
-  id: String,
+  id: {index: true, type: String},
   manage: Boolean,
   mentionable: Boolean,
   name: String,
@@ -351,7 +360,7 @@ export const UserSchema = new Schema({
   email: {set: deleteEmpty, type: String},
   discriminator: String,
   flags: {set: deleteEmpty, type: Number},
-  id: String,
+  id: {index: true, type: String},
   locale: {set: deleteEmpty, type: String},
   mfa_enabled: {set: deleteEmpty, type: Boolean},
   phone: {set: deleteEmpty, type: String},
@@ -385,18 +394,18 @@ export type TVoiceStateSchema = IRole & Document;
 
 export const VoiceStateSchema = new Schema({
   _shardId: {index: true, type: Number},
-  channel_id: {set: deleteEmpty, type: String},
+  channel_id: {index: true, set: deleteEmpty, type: String},
   deaf: Boolean,
-  guild_id: {set: deleteEmpty, type: String},
+  guild_id: {index: true, set: deleteEmpty, type: String},
   mute: Boolean,
   self_deaf: Boolean,
   self_mute: Boolean,
   self_stream: Boolean,
   self_video: Boolean,
-  server_id: String,
+  server_id: {index: true, type: String},
   session_id: String,
   suppress: Boolean,
-  user_id: String,
+  user_id: {index: true, type: String},
 });
 VoiceStateSchema.index({
   _shardId: 1,

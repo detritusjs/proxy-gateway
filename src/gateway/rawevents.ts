@@ -659,6 +659,7 @@ export namespace GatewayRawEvents {
     max_members: number,
     max_presences: number,
     members: Array<RawMember>,
+    member_count: number,
     mfa_level: number,
     name: string,
     owner_id: string,

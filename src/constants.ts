@@ -1,4 +1,8 @@
+import { Constants as RestConstants } from 'detritus-client-rest';
 import { Constants as SocketConstants } from 'detritus-client-socket';
+
+const { AuthTypes } = RestConstants;
+export { AuthTypes };
 
 const {
   GatewayDispatchEvents,
