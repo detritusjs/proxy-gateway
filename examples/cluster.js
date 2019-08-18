@@ -1,8 +1,8 @@
-const { MockGatewayCluster } = require('../lib');
+const { ProxyCluster } = require('../lib');
 
 
 const token = '';
-const cluster = new MockGatewayCluster(token, {
+const cluster = new ProxyCluster(token, {
   shardCount: 144,
   shards: [0, 5], // load up shards 0, 1, 2, 3, 4, 5 on this cluster
 });

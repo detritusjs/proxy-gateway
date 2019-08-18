@@ -16,3 +16,11 @@ export {
 };
 
 export type Snowflake = number | string;
+
+
+export const ClusterIPCOpCodes = Object.freeze({
+  READY: 0,
+  DISCONNECT: 1,
+  RECONNECTING: 2,
+  RESPAWN_ALL: 3,
+});

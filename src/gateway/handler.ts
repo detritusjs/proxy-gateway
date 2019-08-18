@@ -3,7 +3,7 @@ import {
   GatewayOpCodes,
   PresenceStatuses,
 } from '../constants';
-import { MockGateway } from '../mockgateway';
+import { ShardProxy } from '../proxy';
 
 import {
   IChannel,
@@ -27,7 +27,7 @@ export interface GatewayHandlerOptions {
 }
 
 export class GatewayHandler {
-  readonly shard: MockGateway;
+  readonly shard: ShardProxy;
 
   disabledEvents: Set<string>;
   dispatchHandler: GatewayDispatchHandler;
@@ -43,7 +43,7 @@ export class GatewayHandler {
   ready: boolean = false;
 
   constructor(
-    shard: MockGateway,
+    shard: ShardProxy,
     options: GatewayHandlerOptions = {},
   ) {
     this.shard = shard;

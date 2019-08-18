@@ -1,42 +1,42 @@
-import { Mongoose } from 'mongoose';
-
 import { Client as DetritusRestClient } from 'detritus-client-rest';
 import { BaseCollection, EventEmitter, Timers } from 'detritus-utils';
 
+import { ProxyClusterProcessChild } from './cluster/processchild';
 import { AuthTypes } from './constants';
 import {
-  MockGateway,
-  MockGatewayOptions,
-  MockGatewayRunOptions,
-} from './mockgateway';
+  ShardProxy,
+  ShardProxyOptions,
+  ShardProxyRunOptions,
+} from './proxy';
 import { Models } from './models';
 
 
-export interface MockGatewayClusterOptions extends MockGatewayOptions {
+export interface ProxyClusterOptions extends ShardProxyOptions {
   shardCount?: number,
   shards?: [number, number],
 }
 
-export interface MockGatewayClusterRunOptions extends MockGatewayRunOptions {
+export interface ProxyClusterRunOptions extends ShardProxyRunOptions {
   delay?: number,
   shardCount?: number,
 }
 
-export class MockGatewayCluster extends EventEmitter {
+export class ProxyCluster extends EventEmitter {
+  readonly manager?: ProxyClusterProcessChild;
   readonly models: Models;
   readonly rest: DetritusRestClient;
-  readonly shards = new BaseCollection<number, MockGateway>();
+  readonly shards = new BaseCollection<number, ShardProxy>();
   readonly token: string;
 
   ran: boolean = false;
   shardCount: number = 0;
   shardEnd: number = -1;
   shardStart: number = 0;
-  shardOptions: MockGatewayOptions = {};
+  shardOptions: ShardProxyOptions = {};
 
   constructor(
     token: string,
-    options: MockGatewayClusterOptions = {},
+    options: ProxyClusterOptions = {},
   ) {
     super();
     options = Object.assign({}, options);
@@ -76,6 +76,10 @@ export class MockGatewayCluster extends EventEmitter {
     this.shardOptions.cluster = this;
 
     this.models = new Models();
+
+    if (process.env.CLUSTER_MANAGER === 'true') {
+      this.manager = new ProxyClusterProcessChild(this);
+    }
   }
 
   setShardCount(value: number): void {
@@ -104,8 +108,8 @@ export class MockGatewayCluster extends EventEmitter {
 
   async run(
     dbUrl: string,
-    options: MockGatewayClusterRunOptions = {},
-  ): Promise<MockGatewayCluster> {
+    options: ProxyClusterRunOptions = {},
+  ): Promise<ProxyCluster> {
     if (this.ran) {
       return this;
     }
@@ -136,7 +140,7 @@ export class MockGatewayCluster extends EventEmitter {
       const shardOptions = Object.assign({}, this.shardOptions);
       shardOptions.gateway = Object.assign({}, shardOptions.gateway, {shardCount, shardId});
 
-      const shard = new MockGateway(this.token, shardOptions);
+      const shard = new ShardProxy(this.token, shardOptions);
       this.shards.set(shardId, shard);
       await shard.run(dbUrl, options);
       if (shardId < this.shardEnd) {

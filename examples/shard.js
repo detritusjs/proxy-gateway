@@ -1,8 +1,8 @@
-const { MockGateway } = require('../lib');
+const { ShardProxy } = require('../lib');
 
 
 const token = '';
-const shard = new MockGateway(token);
+const shard = new ShardProxy(token);
 
 (async () => {
   await shard.run('mongodb://127.0.0.1:27017');

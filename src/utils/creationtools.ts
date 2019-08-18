@@ -1,5 +1,5 @@
 import { GatewayRawEvents } from '../gateway/rawevents';
-import { MockGateway } from '../mockgateway';
+import { ShardProxy } from '../proxy';
 import {
   IChannel,
   IEmoji,
@@ -16,12 +16,12 @@ export const DefaultBulkWriteOptions = {ordered: false};
 
 
 export async function createChannels(
-  mock: MockGateway,
+  shard: ShardProxy,
   channels?: Array<IChannel>,
 ) {
   if (channels && channels.length) {
-    const _shardId = mock.shardId;
-    const { Channel } = mock.models;
+    const _shardId = shard.shardId;
+    const { Channel } = shard.models;
 
     if (Channel) {
       const operations: Array<any> = [];
@@ -43,12 +43,12 @@ export async function createChannels(
 
 
 export async function createEmojis(
-  mock: MockGateway,
+  shard: ShardProxy,
   emojis?: Array<IEmoji>,
 ) {
   if (emojis && emojis.length) {
-    const _shardId = mock.shardId;
-    const { Emoji } = mock.models;
+    const _shardId = shard.shardId;
+    const { Emoji } = shard.models;
 
     if (Emoji) {
       const operations: Array<any> = [];
@@ -70,12 +70,12 @@ export async function createEmojis(
 
 
 export async function createGuilds(
-  mock: MockGateway,
+  shard: ShardProxy,
   guilds?: Array<IGuild>,
 ) {
   if (guilds && guilds.length) {
-    const _shardId = mock.shardId;
-    const { Guild } = mock.models;
+    const _shardId = shard.shardId;
+    const { Guild } = shard.models;
 
     if (Guild) {
       const operations: Array<any> = [];
@@ -97,12 +97,12 @@ export async function createGuilds(
 
 
 export async function createMembers(
-  mock: MockGateway,
+  shard: ShardProxy,
   members?: Array<IMember>,
 ) {
   if (members && members.length) {
-    const _shardId = mock.shardId;
-    const { Member } = mock.models;
+    const _shardId = shard.shardId;
+    const { Member } = shard.models;
 
     if (Member) {
       const operations: Array<any> = [];
@@ -123,12 +123,12 @@ export async function createMembers(
 }
 
 export async function createPresences(
-  mock: MockGateway,
+  shard: ShardProxy,
   presences?: Array<IPresence>,
 ) {
   if (presences && presences.length) {
-    const _shardId = mock.shardId;
-    const { Presence } = mock.models;
+    const _shardId = shard.shardId;
+    const { Presence } = shard.models;
 
     if (Presence) {
       const operations: Array<any> = [];
@@ -149,12 +149,12 @@ export async function createPresences(
 }
 
 export async function createRoles(
-  mock: MockGateway,
+  shard: ShardProxy,
   roles?: Array<IRole>,
 ) {
   if (roles && roles.length) {
-    const _shardId = mock.shardId;
-    const { Role } = mock.models;
+    const _shardId = shard.shardId;
+    const { Role } = shard.models;
 
     if (Role) {
       const operations: Array<any> = [];
@@ -175,12 +175,12 @@ export async function createRoles(
 }
 
 export async function createUsers(
-  mock: MockGateway,
+  shard: ShardProxy,
   users?: Array<IUser>,
 ) {
   if (users && users.length) {
-    const _shardId = mock.shardId;
-    const { User } = mock.models;
+    const _shardId = shard.shardId;
+    const { User } = shard.models;
 
     if (User) {
       const operations: Array<any> = [];
@@ -201,12 +201,12 @@ export async function createUsers(
 }
 
 export async function createVoiceStates(
-  mock: MockGateway,
+  shard: ShardProxy,
   voiceStates?: Array<IVoiceState>,
 ) {
   if (voiceStates && voiceStates.length) {
-    const _shardId = mock.shardId;
-    const { VoiceState } = mock.models;
+    const _shardId = shard.shardId;
+    const { VoiceState } = shard.models;
 
     if (VoiceState) {
       const operations: Array<any> = [];
@@ -230,7 +230,7 @@ export async function createVoiceStates(
 
 
 export async function createRawGuilds(
-  mock: MockGateway,
+  shard: ShardProxy,
   guilds: Array<GatewayRawEvents.RawGuild>,
 ) {
   const channels: Array<IChannel> = [];
@@ -295,12 +295,12 @@ export async function createRawGuilds(
     }
   }
 
-  await createGuilds(mock, guilds);
-  await createChannels(mock, channels);
-  await createEmojis(mock, emojis);
-  await createMembers(mock, members);
-  await createPresences(mock, presences);
-  await createRoles(mock, roles);
-  await createUsers(mock, users);
-  await createVoiceStates(mock, voiceStates);
+  await createGuilds(shard, guilds);
+  await createChannels(shard, channels);
+  await createEmojis(shard, emojis);
+  await createMembers(shard, members);
+  await createPresences(shard, presences);
+  await createRoles(shard, roles);
+  await createUsers(shard, users);
+  await createVoiceStates(shard, voiceStates);
 }

@@ -1,4 +1,4 @@
-import { Model, Mongoose } from 'mongoose';
+import { Model } from 'mongoose';
 
 import {
   Client as DetritusRestClient,
@@ -9,7 +9,7 @@ import { EventEmitter } from 'detritus-utils';
 
 import { AuthTypes } from './constants';
 import { GatewayHandler, GatewayHandlerOptions } from './gateway/handler';
-import { MockGatewayCluster } from './mockgatewaycluster';
+import { ProxyCluster } from './proxycluster';
 import { Models, ModelKeys } from './models';
 
 
@@ -17,27 +17,27 @@ export interface GatewayOptions extends Gateway.SocketOptions, GatewayHandlerOpt
 
 }
 
-export interface MockGatewayOptions {
-  cluster?: MockGatewayCluster,
+export interface ShardProxyOptions {
+  cluster?: ProxyCluster,
   isBot?: boolean,
   gateway?: GatewayOptions,
   rest?: RestOptions,
 }
 
-export interface MockGatewayRunOptions {
+export interface ShardProxyRunOptions {
   dbOptions?: Object,
   url?: string,
   wait?: boolean,
 }
 
-export class MockGateway extends EventEmitter {
-  readonly cluster?: MockGatewayCluster;
+export class ShardProxy extends EventEmitter {
+  readonly cluster?: ProxyCluster;
   readonly gateway: Gateway.Socket;
   readonly handler: GatewayHandler;
   readonly models: Models;
   readonly rest: DetritusRestClient;
 
-  constructor(token: string, options: MockGatewayOptions) {
+  constructor(token: string, options: ShardProxyOptions) {
     super();
     if (!token) {
       throw new Error('Token is required for this library to work.');
@@ -91,8 +91,8 @@ export class MockGateway extends EventEmitter {
 
   async run(
     dbUrl: string,
-    options: MockGatewayRunOptions = {},
-  ): Promise<MockGateway> {
+    options: ShardProxyRunOptions = {},
+  ): Promise<ShardProxy> {
     await this.models.connect(dbUrl, options.dbOptions);
 
     let gatewayUrl = options.url;

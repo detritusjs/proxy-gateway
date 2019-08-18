@@ -1,7 +1,7 @@
 {
-  "name": "detritus-mock-gateway",
+  "name": "detritus-proxy-gateway",
   "version": "0.0.1",
-  "description": "A Discord Mock Gateway (Does not mock Voice), uses MongoDB to store any important states (e.g. Ready Payload, Guilds, Channels, etc..) that you normally get only once",
+  "description": "A Discord Proxy Gateway (Does not mock Proxy), uses MongoDB to store any important states (e.g. Ready Payload, Guilds, Channels, etc..) that you normally get only once",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "files": [
@@ -28,7 +28,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/detritusjs/mock-gateway.git"
+    "url": "git+https://github.com/detritusjs/proxy-gateway.git"
   },
   "keywords": [
     "typescript",
@@ -43,7 +43,7 @@
   "author": "cakedan",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/detritusjs/mock-gateway/issues"
+    "url": "https://github.com/detritusjs/proxy-gateway/issues"
   },
-  "homepage": "https://github.com/detritusjs/mock-gateway#readme"
+  "homepage": "https://github.com/detritusjs/proxy-gateway#readme"
 }
