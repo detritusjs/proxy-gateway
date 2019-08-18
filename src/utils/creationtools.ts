@@ -14,7 +14,6 @@ import {
 
 export const DefaultBulkWriteOptions = {ordered: false};
 
-
 export async function createChannels(
   shard: ShardProxy,
   channels?: Array<IChannel>,
@@ -101,11 +100,17 @@ export async function createMembers(
   members?: Array<IMember>,
 ) {
   if (members && members.length) {
+    const models = shard.models;
     const _shardId = shard.shardId;
-    const { Member } = shard.models;
+    const { Member } = models;
 
     if (Member) {
-      const operations: Array<any> = [];
+      let operations: Array<any>;
+      if (models.operationsQueueTime) {
+        operations = models.operations.members;
+      } else {
+        operations = [];
+      }
       for (const member of members) {
         operations.push({
           updateOne: {
@@ -116,7 +121,15 @@ export async function createMembers(
         });
       }
       if (operations.length) {
-        await Member.bulkWrite(operations, <any> DefaultBulkWriteOptions);
+        if (models.operationsQueueTime) {
+          models.operationTimeouts.members.start(models.operationsQueueTime, async () => {
+            const ops = operations.slice(0);
+            operations.length = 0;
+            await Member.bulkWrite(ops, <any> DefaultBulkWriteOptions);
+          });
+        } else {
+          await Member.bulkWrite(operations, <any> DefaultBulkWriteOptions);
+        }
       }
     }
   }
@@ -127,11 +140,17 @@ export async function createPresences(
   presences?: Array<IPresence>,
 ) {
   if (presences && presences.length) {
+    const models = shard.models;
     const _shardId = shard.shardId;
-    const { Presence } = shard.models;
+    const { Presence } = models;
 
     if (Presence) {
-      const operations: Array<any> = [];
+      let operations: Array<any>;
+      if (models.operationsQueueTime) {
+        operations = models.operations.presences;
+      } else {
+        operations = [];
+      }
       for (const presence of presences) {
         operations.push({
           updateOne: {
@@ -142,7 +161,15 @@ export async function createPresences(
         });
       }
       if (operations.length) {
-        await Presence.bulkWrite(operations, <any> DefaultBulkWriteOptions);
+        if (models.operationsQueueTime) {
+          models.operationTimeouts.presences.start(models.operationsQueueTime, async () => {
+            const ops = operations.slice(0);
+            operations.length = 0;
+            await Presence.bulkWrite(ops, <any> DefaultBulkWriteOptions);
+          });
+        } else {
+          await Presence.bulkWrite(operations, <any> DefaultBulkWriteOptions);
+        }
       }
     }
   }
@@ -179,11 +206,17 @@ export async function createUsers(
   users?: Array<IUser>,
 ) {
   if (users && users.length) {
+    const models = shard.models;
     const _shardId = shard.shardId;
-    const { User } = shard.models;
+    const { User } = models;
 
     if (User) {
-      const operations: Array<any> = [];
+      let operations: Array<any>;
+      if (models.operationsQueueTime) {
+        operations = models.operations.users;
+      } else {
+        operations = [];
+      }
       for (const user of users) {
         operations.push({
           updateOne: {
@@ -194,7 +227,15 @@ export async function createUsers(
         });
       }
       if (operations.length) {
-        await User.bulkWrite(operations, <any> DefaultBulkWriteOptions);
+        if (models.operationsQueueTime) {
+          models.operationTimeouts.users.start(models.operationsQueueTime, async () => {
+            const ops = operations.slice(0);
+            operations.length = 0;
+            await User.bulkWrite(ops, <any> DefaultBulkWriteOptions);
+          });
+        } else {
+          await User.bulkWrite(operations, <any> DefaultBulkWriteOptions);
+        }
       }
     }
   }

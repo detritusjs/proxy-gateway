@@ -21,6 +21,7 @@ export interface ShardProxyOptions {
   cluster?: ProxyCluster,
   isBot?: boolean,
   gateway?: GatewayOptions,
+  models?: Models,
   rest?: RestOptions,
 }
 
@@ -37,6 +38,8 @@ export class ShardProxy extends EventEmitter {
   readonly models: Models;
   readonly rest: DetritusRestClient;
 
+  ran: boolean = false;
+
   constructor(token: string, options: ShardProxyOptions) {
     super();
     if (!token) {
@@ -49,7 +52,7 @@ export class ShardProxy extends EventEmitter {
     this.gateway = new Gateway.Socket(token, options.gateway);
 
     this.handler = new GatewayHandler(this, options.gateway);
-    this.models = new Models();
+    this.models = options.models || new Models();
     this.rest = new DetritusRestClient(token, Object.assign({
       authType: (options.isBot) ? AuthTypes.BOT : AuthTypes.USER,
     }, options.rest));
@@ -93,23 +96,26 @@ export class ShardProxy extends EventEmitter {
     dbUrl: string,
     options: ShardProxyRunOptions = {},
   ): Promise<ShardProxy> {
-    await this.models.connect(dbUrl, options.dbOptions);
+    if (!this.ran) {
+      this.ran = true;
+      await this.models.connect(dbUrl, options.dbOptions);
 
-    let gatewayUrl = options.url;
-    if (!gatewayUrl) {
-      const data = await this.rest.fetchGateway();
-      gatewayUrl = data.url;
-    }
-    this.gateway.connect(gatewayUrl);
-
-    const wait = options.wait || options.wait === undefined;
-    await new Promise((resolve) => {
-      if (wait) {
-        this.gateway.once('ready', resolve);
-      } else {
-        resolve();
+      let gatewayUrl = options.url;
+      if (!gatewayUrl) {
+        const data = await this.rest.fetchGateway();
+        gatewayUrl = data.url;
       }
-    });
+      this.gateway.connect(gatewayUrl);
+
+      const wait = options.wait || options.wait === undefined;
+      await new Promise((resolve) => {
+        if (wait) {
+          this.gateway.once('ready', resolve);
+        } else {
+          resolve();
+        }
+      });
+    }
     return this;
   }
 }

@@ -65,6 +65,8 @@ export class ProxyCluster extends EventEmitter {
       this.shardStart = +shardStart;
     }
 
+    this.models = new Models();
+
     Object.assign(this.shardOptions, options);
     this.shardOptions.isBot = true;
     this.shardOptions.rest = Object.assign({}, this.shardOptions.rest);
@@ -74,8 +76,7 @@ export class ProxyCluster extends EventEmitter {
     this.shardOptions.rest.globalBucket = this.rest.globalBucket;
 
     this.shardOptions.cluster = this;
-
-    this.models = new Models();
+    this.shardOptions.models = this.models;
 
     if (process.env.CLUSTER_MANAGER === 'true') {
       this.manager = new ProxyClusterProcessChild(this);
@@ -118,7 +119,7 @@ export class ProxyCluster extends EventEmitter {
       url: process.env.GATEWAY_URL,
     }, options);
 
-    const delay = <number> options.delay;
+    const maxDelay = +(<number> options.delay);
 
     let shardCount: number = options.shardCount || this.shardCount || 0;
     if (!options.url || !shardCount) {
@@ -137,14 +138,20 @@ export class ProxyCluster extends EventEmitter {
     await this.models.connect(dbUrl, options.dbOptions);
 
     for (let shardId = this.shardStart; shardId <= this.shardEnd; shardId++) {
+      const now = Date.now();
       const shardOptions = Object.assign({}, this.shardOptions);
       shardOptions.gateway = Object.assign({}, shardOptions.gateway, {shardCount, shardId});
 
       const shard = new ShardProxy(this.token, shardOptions);
       this.shards.set(shardId, shard);
       await shard.run(dbUrl, options);
+
+      const took = Date.now() - now;
       if (shardId < this.shardEnd) {
-        await Timers.sleep(delay);
+        const delay = Math.min(maxDelay, Math.max(maxDelay - took, 0));
+        if (delay) {
+          await Timers.sleep(delay);
+        }
       }
     }
     Object.defineProperty(this, 'ran', {value: true});

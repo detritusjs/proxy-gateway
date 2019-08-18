@@ -84,7 +84,7 @@ export class ProxyClusterManager {
       delay: 5000,
     }, options);
 
-    const delay = <number> options.delay;
+    const _delay = +(<number> options.delay);
 
     let shardCount: number = +(options.shardCount || this.shardCount || 0);
     let url: string = options.url || '';
@@ -103,23 +103,30 @@ export class ProxyClusterManager {
 
     let clusterId = 0;
     for (let shardStart = this.shardStart; shardStart <= this.shardEnd; shardStart += this.shardsPerCluster) {
+      const now = Date.now();
+
       shardStart = Math.min(shardStart, this.shardEnd);
       const shardEnd = Math.min(shardStart + this.shardsPerCluster - 1, this.shardEnd);
 
       const clusterProcess = new ProxyClusterProcess(this, {
         clusterId,
-        env: {
-          GATEWAY_URL: url,
-        },
+        env: {GATEWAY_URL: url},
         shardCount,
         shardEnd,
         shardStart,
       });
       this.processes.set(clusterId, clusterProcess);
       await clusterProcess.run();
+
+      const took = Date.now() - now;
       if (shardEnd < this.shardEnd) {
-        await Timers.sleep(delay * (shardEnd - shardStart));
+        const maxDelay = (_delay * (shardEnd - shardStart));
+        const delay = Math.min(maxDelay, Math.max(maxDelay - took, 0));
+        if (delay) {
+          await Timers.sleep(delay);
+        }
       }
+
       clusterId++;
     }
     Object.defineProperty(this, 'ran', {value: true});
