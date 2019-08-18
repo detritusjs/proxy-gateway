@@ -15,7 +15,7 @@ export const OverwriteSchema = new Schema({
 
 
 export interface IChannel extends GatewayRawEvents.RawChannel {
-
+  recipient_ids?: Array<string>,
 }
 
 export type TChannelSchema = IChannel & Document;
@@ -32,10 +32,10 @@ export const ChannelSchema = new Schema({
   nsfw: {set: deleteEmpty, type: Boolean},
   owner_id: {set: deleteEmpty, type: String},
   parent_id: {set: deleteEmpty, type: String},
-  //permission_overwrites: [{type: Schema.Types.ObjectId, ref: 'Overwrite'}],
   permission_overwrites: {set: deleteEmpty, type: [OverwriteSchema]},
   position: {set: deleteEmpty, type: Number},
   rate_limit_per_user: {set: deleteEmpty, type: Number},
+  recipient_ids: {set: deleteEmpty, type: [String]},
   //recipients
   topic: {set: deleteEmpty, type: String},
   type: Number,
@@ -250,7 +250,7 @@ export const PresenceActivitySchema = new Schema({
 
 export interface IPresence {
   activities: Array<GatewayRawEvents.RawPresenceActivity>,
-  cache_id: string,
+  guild_id: string,
   client_status: {
     desktop?: string,
     mobile?: string,
@@ -267,28 +267,32 @@ export type TPresenceSchema = IPresence & Document;
 export const PresenceSchema = new Schema({
   _shardId: {index: true, type: Number},
   activities: [PresenceActivitySchema],
-  cache_id: {index: true, type: String},
   client_status: {
     desktop: {set: deleteEmpty, type: String},
     mobile: {set: deleteEmpty, type: String},
     web: {set: deleteEmpty, type: String},
   },
   game: {set: deleteEmpty, type: PresenceActivitySchema},
+  guild_id: {index: true, type: String},
   last_modified: {set: deleteEmpty, type: Number},
   status: String,
   user_id: {index: true, type: String},
 });
 PresenceSchema.index({
   _shardId: 1,
-  cache_id: 1,
+  guild_id: 1,
   user_id: 1,
 }, {unique: true});
 PresenceSchema.index({
   _shardId: 1,
-  cache_id: 1,
+  guild_id: 1,
 });
 PresenceSchema.index({
   _shardId: 1,
+  user_id: 1,
+});
+PresenceSchema.index({
+  guild_id: 1,
   user_id: 1,
 });
 
@@ -419,4 +423,54 @@ VoiceStateSchema.index({
 VoiceStateSchema.index({
   _shardId: 1,
   user_id: 1,
+});
+
+
+GuildSchema.virtual('channels', {
+  ref: 'Channel',
+  localField: 'id',
+  foreignField: 'guild_id',
+  justOne: false,
+});
+GuildSchema.virtual('emojis', {
+  ref: 'Emoji',
+  localField: 'id',
+  foreignField: 'guild_id',
+  justOnce: false,
+});
+GuildSchema.virtual('members', {
+  ref: 'Member',
+  localField: 'id',
+  foreignField: 'guild_id',
+  justOne: false,
+});
+GuildSchema.virtual('presences', {
+  ref: 'Presence',
+  localField: 'id',
+  foreignField: 'guild_id',
+  justOne: false,
+});
+GuildSchema.virtual('roles', {
+  ref: 'Role',
+  localField: 'id',
+  foreignField: 'guild_id',
+  justOne: false,
+});
+GuildSchema.virtual('voicestates', {
+  ref: 'VoiceState',
+  localField: 'id',
+  foreignField: 'guild_id',
+  justOne: false,
+});
+MemberSchema.virtual('user', {
+  ref: 'User',
+  localField: 'user_id',
+  foreignField: 'id',
+  justOne: true,
+});
+PresenceSchema.virtual('user', {
+  ref: 'User',
+  localField: 'user_id',
+  foreignField: 'id',
+  justOne: true,
 });

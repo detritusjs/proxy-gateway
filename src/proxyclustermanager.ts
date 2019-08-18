@@ -32,7 +32,7 @@ export class ProxyClusterManager {
   shardCount: number = 0;
   shardEnd: number = -1;
   shardStart: number = 0;
-  shardsPerCluster: number = 6;
+  shardsPerCluster: number = 8;
 
   constructor(
     file: string,

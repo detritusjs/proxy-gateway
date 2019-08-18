@@ -46,7 +46,7 @@ export class Models {
     users: new Timers.Timeout(),
   };
 
-  operationsQueueTime: number = 200;
+  operationsQueueTime: number = 100;
   ran: boolean = false;
 
   Channel?: Model<TChannelSchema>;

@@ -126,7 +126,20 @@ export class GatewayDispatchHandler {
     await CreationTools.createUsers(this.shard, [user]);
 
     if (data.private_channels) {
-      await CreationTools.createChannels(this.shard, data.private_channels);
+      const channels: Array<IChannel> = data.private_channels;
+      const users: Array<IUser> = [];
+
+      for (const channel of channels) {
+        if (channel.recipients) {
+          channel.recipient_ids = channel.recipients.map((recipient) => {
+            users.push(recipient);
+            return recipient.id;
+          });
+        }
+      }
+
+      await CreationTools.createChannels(this.shard, channels);
+      await CreationTools.createUsers(this.shard, users);
     }
 
     if (data.guilds) {
@@ -155,7 +168,7 @@ export class GatewayDispatchHandler {
 
     if (data.presences) {
       await CreationTools.createPresences(this.shard, data.presences.map((presence: any) => {
-        presence.cache_id = '@me';
+        presence.guild_id = '@me';
         presence.user_id = presence.user.id;
         return <IPresence> presence;
       }));
@@ -171,7 +184,18 @@ export class GatewayDispatchHandler {
   }
 
   async [GatewayDispatchEvents.CHANNEL_CREATE](data: GatewayRawEvents.ChannelCreate) {
-    await CreationTools.createChannels(this.shard, [data]);
+    const channel = <IChannel> <unknown> data;
+    if (channel.recipients) {
+      const users: Array<IUser> = [];
+
+      channel.recipient_ids = channel.recipients.map((recipient) => {
+        users.push(recipient);
+        return recipient.id;
+      });
+
+      await CreationTools.createUsers(this.shard, users);
+    }
+    await CreationTools.createChannels(this.shard, [channel]);
   }
 
   async [GatewayDispatchEvents.CHANNEL_DELETE](data: GatewayRawEvents.ChannelDelete) {
@@ -184,14 +208,30 @@ export class GatewayDispatchHandler {
   }
 
   async [GatewayDispatchEvents.CHANNEL_PINS_UPDATE](data: GatewayRawEvents.ChannelPinsUpdate) {
-    // pretty much a very partial channel object lol
-    const channel = <any> data;
-    await CreationTools.createChannels(this.shard, [channel]);
+    const _shardId = this.shard.shardId;
+    const { Channel } = this.shard.models;
+
+    if (Channel) {
+      await Channel.updateOne({id: data.channel_id, _shardId}, {last_pin_timestamp: data.last_pin_timestamp});
+    }
   }
 
   async [GatewayDispatchEvents.CHANNEL_UPDATE](data: GatewayRawEvents.ChannelUpdate) {
-    await CreationTools.createChannels(this.shard, [data]);
+    const channel = <IChannel> <unknown> data;
+    if (channel.recipients) {
+      const users: Array<IUser> = [];
+
+      channel.recipient_ids = channel.recipients.map((recipient) => {
+        users.push(recipient);
+        return recipient.id;
+      });
+
+      await CreationTools.createUsers(this.shard, users);
+    }
+    await CreationTools.createChannels(this.shard, [channel]);
   }
+
+  // maybe store user from ban events?
 
   async [GatewayDispatchEvents.GUILD_CREATE](data: GatewayRawEvents.GuildCreate) {
     await CreationTools.createRawGuilds(this.shard, [data]);
@@ -386,7 +426,12 @@ export class GatewayDispatchHandler {
     await CreationTools.createMembers(this.shard, members);
     await CreationTools.createUsers(this.shard, users);
 
-    // update channel last message id
+    const _shardId = this.shard.shardId;
+    const { Channel } = this.shard.models;
+
+    if (Channel) {
+      await Channel.updateOne({id: data.channel_id, _shardId}, {last_message_id: data.id});
+    }
   }
 
   async [GatewayDispatchEvents.PRESENCE_UPDATE](data: GatewayRawEvents.PresenceUpdate) {
@@ -399,14 +444,14 @@ export class GatewayDispatchHandler {
       const { Presence } = this.shard.models;
       if (Presence) {
         await Presence.deleteOne({
-          cache_id: cacheId,
+          guild_id: cacheId,
           user_id: user.id,
           _shardId,
         });
       }
     } else {
       const presence = <IPresence> <unknown> data;
-      presence.cache_id = cacheId;
+      presence.guild_id = cacheId;
       presence.user_id = user.id;
       await CreationTools.createPresences(this.shard, [presence]);
     }

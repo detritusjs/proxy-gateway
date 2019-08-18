@@ -154,7 +154,7 @@ export async function createPresences(
       for (const presence of presences) {
         operations.push({
           updateOne: {
-            filter: {cache_id: presence.cache_id, user_id: presence.user_id, _shardId},
+            filter: {guild_id: presence.guild_id, user_id: presence.user_id, _shardId},
             update: {...presence, _shardId},
             upsert: true,
           },
@@ -312,7 +312,7 @@ export async function createRawGuilds(
     if (guild.presences) {
       for (const raw of guild.presences) {
         const presence = <any> raw;
-        presence.cache_id = guild.id;
+        presence.guild_id = guild.id;
         presence.user_id = presence.user.id;
         presences.push(presence);
       }

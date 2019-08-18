@@ -3,7 +3,7 @@ const { ProxyCluster } = require('../lib');
 // we dont have to pass in a token anymore since it'll get it from the env variables from the fork
 const cluster = new ProxyCluster('', {
   shardOptions: {
-    gateway: {loadAllMembers: true},
+    gateway: {loadAllMembers: true}, // should only be set for small bots, this uses a ton of cpu if in a lot of guilds
   },
 });
 
