@@ -22,6 +22,13 @@ import {
 } from './schemas';
 
 
+
+export interface ModelOperation {
+  ops: Array<any>,
+  time: number,
+  timer: Timers.Timeout,
+}
+
 export const ModelKeys = Object.freeze([
   'Channel',
   'Emoji',
@@ -35,18 +42,49 @@ export const ModelKeys = Object.freeze([
 
 export class Models {
   readonly mongoose = new Mongoose();
-  readonly operations: {[key: string]: any} = {
-    members: [],
-    presences: [],
-    users: [],
-  };
-  readonly operationTimeouts: {[key: string]: Timers.Timeout} = {
-    members: new Timers.Timeout(),
-    presences: new Timers.Timeout(),
-    users: new Timers.Timeout(),
+  readonly operations: {[key: string]: ModelOperation} = {
+    channels: {
+      ops: [],
+      time: 0,
+      timer: new Timers.Timeout(),
+    },
+    emojis: {
+      ops: [],
+      time: 0,
+      timer: new Timers.Timeout(),
+    },
+    guilds: {
+      ops: [],
+      time: 0,
+      timer: new Timers.Timeout(),
+    },
+    members: {
+      ops: [],
+      time: 100,
+      timer: new Timers.Timeout(),
+    },
+    presences: {
+      ops: [],
+      time: 100,
+      timer: new Timers.Timeout(),
+    },
+    roles: {
+      ops: [],
+      time: 0,
+      timer: new Timers.Timeout(),
+    },
+    users: {
+      ops: [],
+      time: 100,
+      timer: new Timers.Timeout(),
+    },
+    voiceStates: {
+      ops: [],
+      time: 0,
+      timer: new Timers.Timeout(),
+    },
   };
 
-  operationsQueueTime: number = 100;
   ran: boolean = false;
 
   Channel?: Model<TChannelSchema>;
@@ -73,10 +111,12 @@ export class Models {
     if (!this.ran) {
       await this.mongoose.connect(url, Object.assign({
         dbName: 'detritus',
+        poolSize: 12,
         useCreateIndex: true,
         useNewUrlParser: true,
       }, options));
       this.intialize();
+      this.ran = true;
     }
     return this;
   }

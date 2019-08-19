@@ -1,4 +1,7 @@
+import { Model as MongooseModel } from 'mongoose';
+
 import { GatewayRawEvents } from '../gateway/rawevents';
+import { ModelOperation } from '../models';
 import { ShardProxy } from '../proxy';
 import {
   IChannel,
@@ -12,7 +15,11 @@ import {
 } from '../schemas';
 
 
-export const DefaultBulkWriteOptions = {ordered: false};
+export const DefaultBulkWriteOptions = {
+  j: false,
+  ordered: false,
+  w: 0,
+};
 
 export async function createChannels(
   shard: ShardProxy,
@@ -21,21 +28,23 @@ export async function createChannels(
   if (channels && channels.length) {
     const _shardId = shard.shardId;
     const { Channel } = shard.models;
+    const operations = shard.models.operations.channels;
 
     if (Channel) {
-      const operations: Array<any> = [];
+      const ops = (operations.time) ? operations.ops : [];
       for (const channel of channels) {
-        operations.push({
+        const update = <any> channel;
+        update._shardId = _shardId;
+
+        ops.push({
           updateOne: {
             filter: {id: channel.id, _shardId},
-            update: {...channel, _shardId},
+            update: {$set: update},
             upsert: true,
           },
         });
       }
-      if (operations.length) {
-        await Channel.bulkWrite(operations, <any> DefaultBulkWriteOptions);
-      }
+      await startOperations(Channel, ops, operations);
     }
   }
 }
@@ -48,21 +57,23 @@ export async function createEmojis(
   if (emojis && emojis.length) {
     const _shardId = shard.shardId;
     const { Emoji } = shard.models;
+    const operations = shard.models.operations.emojis;
 
     if (Emoji) {
-      const operations: Array<any> = [];
+      const ops = (operations.time) ? operations.ops : [];
       for (const emoji of emojis) {
-        operations.push({
+        const update = <any> emoji;
+        update._shardId = _shardId;
+
+        ops.push({
           updateOne: {
             filter: {id: emoji.id, _shardId},
-            update: {...emoji, _shardId},
+            update: {$set: update},
             upsert: true,
           },
         });
       }
-      if (operations.length) {
-        await Emoji.bulkWrite(operations, <any> DefaultBulkWriteOptions);
-      }
+      await startOperations(Emoji, ops, operations);
     }
   }
 }
@@ -75,21 +86,23 @@ export async function createGuilds(
   if (guilds && guilds.length) {
     const _shardId = shard.shardId;
     const { Guild } = shard.models;
+    const operations = shard.models.operations.guilds;
 
     if (Guild) {
-      const operations: Array<any> = [];
+      const ops = (operations.time) ? operations.ops : [];
       for (const guild of guilds) {
-        operations.push({
+        const update = <any> guild;
+        update._shardId = _shardId;
+
+        ops.push({
           updateOne: {
             filter: {id: guild.id, _shardId},
-            update: {...guild, _shardId},
+            update: {$set: update},
             upsert: true,
           },
         });
       }
-      if (operations.length) {
-        await Guild.bulkWrite(operations, <any> DefaultBulkWriteOptions);
-      }
+      await startOperations(Guild, ops, operations);
     }
   }
 }
@@ -100,37 +113,25 @@ export async function createMembers(
   members?: Array<IMember>,
 ) {
   if (members && members.length) {
-    const models = shard.models;
     const _shardId = shard.shardId;
-    const { Member } = models;
+    const { Member } = shard.models;
+    const operations = shard.models.operations.members;
 
     if (Member) {
-      let operations: Array<any>;
-      if (models.operationsQueueTime) {
-        operations = models.operations.members;
-      } else {
-        operations = [];
-      }
+      const ops = (operations.time) ? operations.ops : [];
       for (const member of members) {
-        operations.push({
+        const update = <any> member;
+        update._shardId = _shardId;
+
+        ops.push({
           updateOne: {
             filter: {guild_id: member.guild_id, user_id: member.user_id, _shardId},
-            update: {...member, _shardId},
+            update: {$set: update},
             upsert: true,
           },
         });
       }
-      if (operations.length) {
-        if (models.operationsQueueTime) {
-          models.operationTimeouts.members.start(models.operationsQueueTime, async () => {
-            const ops = operations.slice(0);
-            operations.length = 0;
-            await Member.bulkWrite(ops, <any> DefaultBulkWriteOptions);
-          });
-        } else {
-          await Member.bulkWrite(operations, <any> DefaultBulkWriteOptions);
-        }
-      }
+      await startOperations(Member, ops, operations);
     }
   }
 }
@@ -140,37 +141,25 @@ export async function createPresences(
   presences?: Array<IPresence>,
 ) {
   if (presences && presences.length) {
-    const models = shard.models;
     const _shardId = shard.shardId;
-    const { Presence } = models;
+    const { Presence } = shard.models;
+    const operations = shard.models.operations.presences;
 
     if (Presence) {
-      let operations: Array<any>;
-      if (models.operationsQueueTime) {
-        operations = models.operations.presences;
-      } else {
-        operations = [];
-      }
+      const ops = (operations.time) ? operations.ops : [];
       for (const presence of presences) {
-        operations.push({
+        const update = <any> presence;
+        update._shardId = _shardId;
+
+        ops.push({
           updateOne: {
             filter: {guild_id: presence.guild_id, user_id: presence.user_id, _shardId},
-            update: {...presence, _shardId},
+            update: {$set: update},
             upsert: true,
           },
         });
       }
-      if (operations.length) {
-        if (models.operationsQueueTime) {
-          models.operationTimeouts.presences.start(models.operationsQueueTime, async () => {
-            const ops = operations.slice(0);
-            operations.length = 0;
-            await Presence.bulkWrite(ops, <any> DefaultBulkWriteOptions);
-          });
-        } else {
-          await Presence.bulkWrite(operations, <any> DefaultBulkWriteOptions);
-        }
-      }
+      await startOperations(Presence, ops, operations);
     }
   }
 }
@@ -182,21 +171,23 @@ export async function createRoles(
   if (roles && roles.length) {
     const _shardId = shard.shardId;
     const { Role } = shard.models;
+    const operations = shard.models.operations.roles;
 
     if (Role) {
-      const operations: Array<any> = [];
+      const ops = (operations.time) ? operations.ops : [];
       for (const role of roles) {
-        operations.push({
+        const update = <any> role;
+        update._shardId = _shardId;
+
+        ops.push({
           updateOne: {
             filter: {guild_id: role.guild_id, id: role.id, _shardId},
-            update: {...role, _shardId},
+            update: {$set: update},
             upsert: true,
           },
         });
       }
-      if (operations.length) {
-        await Role.bulkWrite(operations, <any> DefaultBulkWriteOptions);
-      }
+      await startOperations(Role, ops, operations);
     }
   }
 }
@@ -206,37 +197,25 @@ export async function createUsers(
   users?: Array<IUser>,
 ) {
   if (users && users.length) {
-    const models = shard.models;
     const _shardId = shard.shardId;
-    const { User } = models;
+    const { User } = shard.models;
+    const operations = shard.models.operations.users;
 
     if (User) {
-      let operations: Array<any>;
-      if (models.operationsQueueTime) {
-        operations = models.operations.users;
-      } else {
-        operations = [];
-      }
+      const ops = (operations.time) ? operations.ops : [];
       for (const user of users) {
-        operations.push({
+        const update = <any> user;
+        update._shardId = _shardId;
+
+        ops.push({
           updateOne: {
             filter: {id: user.id, _shardId},
-            update: {...user, _shardId},
+            update: {$set: update},
             upsert: true,
           },
         });
       }
-      if (operations.length) {
-        if (models.operationsQueueTime) {
-          models.operationTimeouts.users.start(models.operationsQueueTime, async () => {
-            const ops = operations.slice(0);
-            operations.length = 0;
-            await User.bulkWrite(ops, <any> DefaultBulkWriteOptions);
-          });
-        } else {
-          await User.bulkWrite(operations, <any> DefaultBulkWriteOptions);
-        }
-      }
+      await startOperations(User, ops, operations);
     }
   }
 }
@@ -248,25 +227,26 @@ export async function createVoiceStates(
   if (voiceStates && voiceStates.length) {
     const _shardId = shard.shardId;
     const { VoiceState } = shard.models;
+    const operations = shard.models.operations.voiceStates;
 
     if (VoiceState) {
-      const operations: Array<any> = [];
+      const ops = (operations.time) ? operations.ops : [];
       for (const voiceState of voiceStates) {
-        operations.push({
+        const update = <any> voiceState;
+        update._shardId = _shardId;
+
+        ops.push({
           updateOne: {
             filter: {server_id: voiceState.server_id, user_id: voiceState.user_id, _shardId},
-            update: {...voiceState, _shardId},
+            update: {$set: update},
             upsert: true,
           },
         });
       }
-      if (operations.length) {
-        await VoiceState.bulkWrite(operations, <any> DefaultBulkWriteOptions);
-      }
+      await startOperations(VoiceState, ops, operations);
     }
   }
 }
-
 
 
 
@@ -289,6 +269,8 @@ export async function createRawGuilds(
         channel.guild_id = guild.id;
         channels.push(channel);
       }
+      // @ts-ignore
+      guild.channels = undefined;
     }
 
     if (guild.emojis) {
@@ -297,6 +279,8 @@ export async function createRawGuilds(
         emoji.guild_id = guild.id;
         emojis.push(emoji);
       }
+      // @ts-ignore
+      guild.emojis = undefined;
     }
 
     if (guild.members) {
@@ -307,6 +291,8 @@ export async function createRawGuilds(
         members.push(member);
         users.push(member.user);
       }
+      // @ts-ignore
+      guild.members = undefined;
     }
 
     if (guild.presences) {
@@ -316,6 +302,8 @@ export async function createRawGuilds(
         presence.user_id = presence.user.id;
         presences.push(presence);
       }
+      // @ts-ignore
+      guild.presences = undefined;
     }
 
     if (guild.roles) {
@@ -324,6 +312,8 @@ export async function createRawGuilds(
         role.guild_id = guild.id;
         roles.push(role);
       }
+      // @ts-ignore
+      guild.roles = undefined;
     }
 
     if (guild.voice_states) {
@@ -333,15 +323,68 @@ export async function createRawGuilds(
         voiceState.server_id = guild.id;
         voiceStates.push(voiceState);
       }
+      // @ts-ignore
+      guild.voice_states = undefined;
     }
   }
+
+  await createMembers(shard, members);
+  await createUsers(shard, users);
 
   await createGuilds(shard, guilds);
   await createChannels(shard, channels);
   await createEmojis(shard, emojis);
-  await createMembers(shard, members);
   await createPresences(shard, presences);
   await createRoles(shard, roles);
-  await createUsers(shard, users);
   await createVoiceStates(shard, voiceStates);
+
+  /*
+  setImmediate(createGuilds, shard, guilds);
+  setImmediate(createChannels, shard, channels);
+  setImmediate(createEmojis, shard, emojis);
+  setImmediate(createMembers, shard, members);
+  setImmediate(createPresences, shard, presences);
+  setImmediate(createRoles, shard, roles);
+  setImmediate(createUsers, shard, users);
+  setImmediate(createVoiceStates, shard, voiceStates);
+  */
+  /*
+  await Promise.all([
+    createGuilds(shard, guilds),
+    createChannels(shard, channels),
+    createEmojis(shard, emojis),
+    createMembers(shard, members),
+    createPresences(shard, presences),
+    createRoles(shard, roles),
+    createUsers(shard, users),
+    createVoiceStates(shard, voiceStates),
+  ]);
+  */
+}
+
+
+export async function startOperations(
+  Model: MongooseModel<any>,
+  ops: Array<any>,
+  operations: ModelOperation,
+) {
+  if (ops.length) {
+    if (operations.time) {
+      if (!operations.timer.hasStarted) {
+        const handler = async () => {
+          const cloned = ops.slice(0);
+          ops.length = 0;
+          const now = Date.now();
+          await Model.bulkWrite(cloned, <any> DefaultBulkWriteOptions);
+          console.log(Date.now() - now, '-', cloned.length, Model.prototype.name);
+          if (ops.length) {
+            operations.timer.start(operations.time, handler, false);
+          }
+        };
+        operations.timer.start(operations.time, handler, false);
+      }
+    } else {
+      await Model.bulkWrite(ops, <any> DefaultBulkWriteOptions);
+    }
+  }
 }

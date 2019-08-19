@@ -32,7 +32,7 @@ export class ProxyClusterManager {
   shardCount: number = 0;
   shardEnd: number = -1;
   shardStart: number = 0;
-  shardsPerCluster: number = 8;
+  shardsPerCluster: number = 6;
 
   constructor(
     file: string,
@@ -121,7 +121,8 @@ export class ProxyClusterManager {
       const took = Date.now() - now;
       if (shardEnd < this.shardEnd) {
         const maxDelay = (_delay * (shardEnd - shardStart));
-        const delay = Math.min(maxDelay, Math.max(maxDelay - took, 0));
+        // const delay = Math.min(maxDelay, Math.max(maxDelay - took, 0));
+        const delay = maxDelay;
         if (delay) {
           await Timers.sleep(delay);
         }

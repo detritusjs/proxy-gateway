@@ -29,6 +29,7 @@ export interface ShardProxyRunOptions {
   dbOptions?: Object,
   url?: string,
   wait?: boolean,
+  waitForFlush?: boolean,
 }
 
 export class ShardProxy extends EventEmitter {
@@ -80,22 +81,28 @@ export class ShardProxy extends EventEmitter {
   }
 
   async reset(): Promise<void> {
+    /*
     const _shardId = this.shardId;
     const models = this.models;
+
+    const flushing: Array<Promise<any>> = [];
     for (const key of ModelKeys) {
       if (key in models) {
         const model = <Model<any>> (<any> models)[key];
         if (model) {
-          await model.deleteMany({_shardId});
+          flushing.push(<any> model.deleteMany({_shardId}));
         }
       }
     }
+
+    await Promise.all(flushing);
+    */
   }
 
   async run(
     dbUrl: string,
     options: ShardProxyRunOptions = {},
-  ): Promise<ShardProxy> {
+  ): Promise<number> {
     if (!this.ran) {
       this.ran = true;
       await this.models.connect(dbUrl, options.dbOptions);
@@ -105,17 +112,25 @@ export class ShardProxy extends EventEmitter {
         const data = await this.rest.fetchGateway();
         gatewayUrl = data.url;
       }
+
+      const now = Date.now();
       this.gateway.connect(gatewayUrl);
 
-      const wait = options.wait || options.wait === undefined;
+      const waitForFlush = options.waitForFlush || options.waitForFlush === undefined;
+      const wait = waitForFlush || options.wait || options.wait === undefined;
       await new Promise((resolve) => {
         if (wait) {
-          this.gateway.once('ready', resolve);
+          if (waitForFlush) {
+            this.once('ready', resolve);
+          } else {
+            this.gateway.once('ready', resolve);
+          }
         } else {
           resolve();
         }
       });
+      return Date.now() - now;
     }
-    return this;
+    return 0;
   }
 }

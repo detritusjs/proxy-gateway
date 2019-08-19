@@ -45,10 +45,6 @@ ChannelSchema.index({
   _shardId: 1,
   id: 1,
 }, {unique: true});
-ChannelSchema.index({
-  _shardId: 1,
-  guild_id: 1,
-});
 
 
 
@@ -80,11 +76,7 @@ EmojiSchema.index({
   _shardId: 1,
   guild_id: 1,
   id: 1,
-});
-EmojiSchema.index({
-  _shardId: 1,
-  id: 1,
-});
+}, {unique: true});
 
 
 
@@ -189,14 +181,6 @@ MemberSchema.index({
   guild_id: 1,
   user_id: 1,
 }, {unique: true});
-MemberSchema.index({
-  _shardId: 1,
-  guild_id: 1,
-});
-MemberSchema.index({
-  _shardId: 1,
-  user_id: 1,
-});
 
 
 
@@ -283,18 +267,6 @@ PresenceSchema.index({
   guild_id: 1,
   user_id: 1,
 }, {unique: true});
-PresenceSchema.index({
-  _shardId: 1,
-  guild_id: 1,
-});
-PresenceSchema.index({
-  _shardId: 1,
-  user_id: 1,
-});
-PresenceSchema.index({
-  guild_id: 1,
-  user_id: 1,
-});
 
 
 
@@ -329,14 +301,6 @@ RoleSchema.index({
   guild_id: 1,
   id: 1,
 }, {unique: true});
-RoleSchema.index({
-  _shardId: 1,
-  guild_id: 1,
-});
-RoleSchema.index({
-  _shardId: 1,
-  id: 1,
-});
 
 
 
@@ -416,14 +380,6 @@ VoiceStateSchema.index({
   server_id: 1,
   user_id: 1,
 }, {unique: true});
-VoiceStateSchema.index({
-  _shardId: 1,
-  server_id: 1,
-});
-VoiceStateSchema.index({
-  _shardId: 1,
-  user_id: 1,
-});
 
 
 GuildSchema.virtual('channels', {

@@ -15,6 +15,7 @@ import {
   IVoiceState,
 } from '../schemas';
 
+import { Bucket } from '../bucket';
 import * as CreationTools from '../utils/creationtools';
 
 import { GatewayRawEvents } from './rawevents';
@@ -39,7 +40,7 @@ export class GatewayHandler {
     done: new Set(),
     left: new Set(),
   };
-  queue: Array<[Function, any]> = [];
+  bucket = new Bucket();
   ready: boolean = false;
 
   constructor(
@@ -80,11 +81,7 @@ export class GatewayHandler {
             handler.call(this.dispatchHandler, data);
           }; break;
           default: {
-            if (this.ready) {
-              handler.call(this.dispatchHandler, data);
-            } else {
-              this.queue.push([handler, data]);
-            }
+            this.bucket.add(handler.bind(this.dispatchHandler), data);
           };
         }
       }
@@ -92,7 +89,7 @@ export class GatewayHandler {
   }
 
   async reset() {
-    this.queue.length = 0;
+    this.bucket.reset();
     await this.shard.reset();
     this.memberChunks.done.clear();
     this.memberChunks.left.clear();
@@ -174,10 +171,9 @@ export class GatewayDispatchHandler {
       }));
     }
 
-    while (this.handler.queue.length) {
-      const [handler, raw] = (<[Function, any]> this.handler.queue.shift());
-      await Promise.resolve(handler.call(this, raw));
-    }
+    const now = Date.now();
+    await this.handler.bucket.flush();
+    console.log('flushing took', Date.now() - now);
 
     this.handler.ready = true;
     this.shard.emit('ready');

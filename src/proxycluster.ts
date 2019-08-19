@@ -110,58 +110,60 @@ export class ProxyCluster extends EventEmitter {
   async run(
     dbUrl: string,
     options: ProxyClusterRunOptions = {},
-  ): Promise<ProxyCluster> {
-    if (this.ran) {
-      return this;
-    }
-    options = Object.assign({
-      delay: 5000,
-      url: process.env.GATEWAY_URL,
-    }, options);
+  ): Promise<number> {
+    if (!this.ran) {
+      options = Object.assign({
+        delay: 5000,
+        url: process.env.GATEWAY_URL,
+      }, options);
 
-    const maxDelay = +(<number> options.delay);
+      const maxDelay = +(<number> options.delay);
 
-    let shardCount: number = options.shardCount || this.shardCount || 0;
-    if (!options.url || !shardCount) {
-      const data = await this.rest.fetchGatewayBot();
-      shardCount = shardCount || data.shards;
-      options.url = options.url || data.url;
-    }
-    if (!shardCount) {
-      throw new Error('Shard Count cannot be 0, pass in one via the options or the constructor.');
-    }
-    this.setShardCount(shardCount);
-    if (this.shardEnd === -1) {
-      this.setShardEnd(shardCount - 1);
-    }
+      let shardCount: number = options.shardCount || this.shardCount || 0;
+      if (!options.url || !shardCount) {
+        const data = await this.rest.fetchGatewayBot();
+        shardCount = shardCount || data.shards;
+        options.url = options.url || data.url;
+      }
+      if (!shardCount) {
+        throw new Error('Shard Count cannot be 0, pass in one via the options or the constructor.');
+      }
+      this.setShardCount(shardCount);
+      if (this.shardEnd === -1) {
+        this.setShardEnd(shardCount - 1);
+      }
 
-    await this.models.connect(dbUrl, options.dbOptions);
+      await this.models.connect(dbUrl, options.dbOptions);
 
-    for (let shardId = this.shardStart; shardId <= this.shardEnd; shardId++) {
       const now = Date.now();
-      const shardOptions = Object.assign({}, this.shardOptions);
-      shardOptions.gateway = Object.assign({}, shardOptions.gateway, {shardCount, shardId});
+      for (let shardId = this.shardStart; shardId <= this.shardEnd; shardId++) {
+        const shardOptions = Object.assign({}, this.shardOptions);
+        shardOptions.gateway = Object.assign({}, shardOptions.gateway, {shardCount, shardId});
 
-      const shard = new ShardProxy(this.token, shardOptions);
-      this.shards.set(shardId, shard);
-      await shard.run(dbUrl, options);
+        const shard = new ShardProxy(this.token, shardOptions);
+        this.shards.set(shardId, shard);
+        this.emit('shard', shard);
 
-      const took = Date.now() - now;
-      if (shardId < this.shardEnd) {
-        const delay = Math.min(maxDelay, Math.max(maxDelay - took, 0));
-        if (delay) {
-          await Timers.sleep(delay);
+        const took = await shard.run(dbUrl, options);
+        if (shardId < this.shardEnd) {
+          // const delay = Math.min(maxDelay, Math.max(maxDelay - took, 0));
+          const delay = maxDelay;
+          if (delay) {
+            await Timers.sleep(delay);
+          }
         }
       }
+      Object.defineProperty(this, 'ran', {value: true});
+      this.emit('ready');
+      return Date.now() - now;
     }
-    Object.defineProperty(this, 'ran', {value: true});
-    this.emit('ready');
-    return this;
+    return 0;
   }
 
   on(event: string, listener: Function): this;
   on(event: 'killed', listener: () => any): this;
   on(event: 'ready', listener: () => any): this;
+  on(event: 'shard', listener: (shard: ShardProxy) => any): this;
   on(event: string, listener: Function): this {
     super.on(event, listener);
     return this;
