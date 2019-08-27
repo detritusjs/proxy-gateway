@@ -374,9 +374,7 @@ export async function startOperations(
         const handler = async () => {
           const cloned = ops.slice(0);
           ops.length = 0;
-          const now = Date.now();
           await Model.bulkWrite(cloned, <any> DefaultBulkWriteOptions);
-          console.log(Date.now() - now, '-', cloned.length, Model.prototype.name);
           if (ops.length) {
             operations.timer.start(operations.time, handler, false);
           }
